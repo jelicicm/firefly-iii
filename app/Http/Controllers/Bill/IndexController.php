@@ -71,21 +71,23 @@ final class IndexController extends Controller
     /**
      * Show all bills.
      */
-    public function index(?Carbon $start = null, ?Carbon $end = null): Application|Factory|\Illuminate\Contracts\Foundation\Application|View
+    public function index(?string $start_date = null, ?string $end_date = null): Application|Factory|\Illuminate\Contracts\Foundation\Application|View
     {
         $this->cleanupObjectGroups();
         $this->repository->correctOrder();
         $this->repository->correctTransfers();
 
-        $range       = Navigation::getViewRange(true);
+        $start = null !== $start_date ? Carbon::createFromFormat('Y-m-d', $start_date)->startOfDay() : null;
+        $end   = null !== $end_date   ? Carbon::createFromFormat('Y-m-d', $end_date)->endOfDay()     : null;
+
+        $range         = Navigation::getViewRange(true);
         $isCustomRange = session('is_custom_range', false);
-        if (false === $isCustomRange) {
-            $start ??= session('start', today(config('app.timezone'))->startOfMonth());
-            $end   ??= Navigation::endOfPeriod($start, $range);
-        }
-        if (true === $isCustomRange) {
+        if ($isCustomRange) {
             $start ??= session('start', today(config('app.timezone'))->startOfMonth());
             $end   ??= session('end', today(config('app.timezone'))->endOfMonth());
+        } else {
+            $start ??= session('start', today(config('app.timezone'))->startOfMonth());
+            $end   ??= Navigation::endOfPeriod($start, $range);
         }
 
         // give the end some extra space when the user has last7, last30 or last90.
@@ -101,7 +103,7 @@ final class IndexController extends Controller
         $prevLoop    = $this->getPreviousPeriods($start, $range);
         $nextLoop    = $this->getNextPeriods($start, $range);
 
-        $collection  = $this->repository->getBills($start, $end);
+        $collection  = $this->repository->getBills();
         $total       = $collection->count();
 
         $parameters  = new ParameterBag();

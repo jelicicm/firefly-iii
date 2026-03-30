@@ -82,7 +82,7 @@ interface BillRepositoryInterface
      */
     public function getAttachments(Bill $bill): Collection;
 
-    public function getBills(?Carbon $start = null, ?Carbon $end = null): Collection;
+    public function getBills(): Collection;
 
     /**
      * Gets the bills which have some kind of relevance to the accounts mentioned.

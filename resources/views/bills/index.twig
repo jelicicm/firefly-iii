@@ -26,13 +26,21 @@
                         </div>
                         <div class="col-lg-8 col-md-4 col-sm-12 col-xs-12 text-center">
                             <div class="btn btn-group btn-group-lg pt-0">
-                                <a href="{{ route(routeName, [prevLoop[0].start.format('Y-m-d'), prevLoop[0].end.format('Y-m-d')]) }}"
-                                   class="btn btn-default" title="{{ prevLoop[0].title }}">&larr;</a>
+                                {% if prevLoop|length > 0 %}
+                                    <a href="{{ route(routeName, [prevLoop[0].start.format('Y-m-d'), prevLoop[0].end.format('Y-m-d')]) }}"
+                                       class="btn btn-default" title="{{ prevLoop[0].title }}">&larr;</a>
+                                {% else %}
+                                    <span class="btn btn-default disabled">&larr;</span>
+                                {% endif %}
                                 <a title="{{ start.isoFormat(monthAndDayFormat) }} - {{ end.isoFormat(monthAndDayFormat) }}"
                                    href="{{ route(routeName, [start.format('Y-m-d'), end.format('Y-m-d')]) }}"
                                    class="btn btn-default">{{ periodTitle }}</a>
-                                <a href="{{ route(routeName, [nextLoop[0].start.format('Y-m-d'), nextLoop[0].end.format('Y-m-d')]) }}"
-                                   class="btn btn-default" title="{{ nextLoop[0].title }}">&rarr;</a>
+                                {% if nextLoop|length > 0 %}
+                                    <a href="{{ route(routeName, [nextLoop[0].start.format('Y-m-d'), nextLoop[0].end.format('Y-m-d')]) }}"
+                                       class="btn btn-default" title="{{ nextLoop[0].title }}">&rarr;</a>
+                                {% else %}
+                                    <span class="btn btn-default disabled">&rarr;</span>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-lg-2 col-md-4 col-sm-12 col-xs-12 text-right">
@@ -89,12 +97,12 @@
     <script src="v1/js/lib/jquery-ui.min.js?v={{ FF_BUILD_TIME }}" type="text/javascript" nonce="{{ JS_NONCE }}"></script>
     <script type="text/javascript" src="v1/js/ff/bills/index.js?v={{ FF_BUILD_TIME }}" nonce="{{ JS_NONCE }}"></script>
     <script type="text/javascript" nonce="{{ JS_NONCE }}">
-        var billsIndexUrl = "{{ route(routeName, ['START', 'END']) }}";
+        var billsIndexUrl = "{{ route(routeName, ['__START__', '__END__']) }}";
         $(function () {
             $('.selectPeriod').change(function (e) {
                 var selected = $(e.currentTarget);
                 if (selected.find(":selected").val() !== "x") {
-                    var newUrl = billsIndexUrl.replace("START", selected.find(":selected").data('start')).replace('END', selected.find(":selected").data('end'));
+                    var newUrl = billsIndexUrl.replace("__START__", selected.find(":selected").data('start')).replace('__END__', selected.find(":selected").data('end'));
                     window.location.assign(newUrl);
                 }
             });
