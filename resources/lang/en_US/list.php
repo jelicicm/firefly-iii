@@ -91,6 +91,7 @@ return [
     'completed'               => 'Completed',
     'iban'                    => 'IBAN',
     'account_number'          => 'Account number',
+    'amount_paid_in_period'   => 'Amount paid',
     'paid_current_period'     => 'Paid this period',
     'email'                   => 'Email',
     'registered_at'           => 'Registered at',

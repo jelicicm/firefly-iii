@@ -5,6 +5,51 @@
 {% endblock %}
 
 {% block content %}
+    <!-- period navigator -->
+    <div class="row">
+        <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+            <div class="box">
+                <div class="box-header with-border">
+                    <h3 class="box-title">{{ 'budget_period_navigator'|_ }}</h3>
+                </div>
+                <div class="box-body">
+                    <div class="row" id="periodNavigator">
+                        <div class="col-lg-2 col-md-4 col-sm-12 col-xs-12">
+                            <select class="form-control selectPeriod" name="previous">
+                                <option label="{{ 'select_date'|_ }}" value="x">{{ 'select_date'|_ }}</option>
+                                {% for array in prevLoop %}
+                                    <option label="{{ array.title }}" value="{{ array.label }}"
+                                            data-start="{{ array.start.format('Y-m-d') }}"
+                                            data-end="{{ array.end.format('Y-m-d') }}">{{ array.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-lg-8 col-md-4 col-sm-12 col-xs-12 text-center">
+                            <div class="btn btn-group btn-group-lg pt-0">
+                                <a href="{{ route(routeName, [prevLoop[0].start.format('Y-m-d'), prevLoop[0].end.format('Y-m-d')]) }}"
+                                   class="btn btn-default" title="{{ prevLoop[0].title }}">&larr;</a>
+                                <a title="{{ start.isoFormat(monthAndDayFormat) }} - {{ end.isoFormat(monthAndDayFormat) }}"
+                                   href="{{ route(routeName, [start.format('Y-m-d'), end.format('Y-m-d')]) }}"
+                                   class="btn btn-default">{{ periodTitle }}</a>
+                                <a href="{{ route(routeName, [nextLoop[0].start.format('Y-m-d'), nextLoop[0].end.format('Y-m-d')]) }}"
+                                   class="btn btn-default" title="{{ nextLoop[0].title }}">&rarr;</a>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-sm-12 col-xs-12 text-right">
+                            <select class="form-control selectPeriod" name="next">
+                                <option label="{{ 'select_date'|_ }}" value="x">{{ 'select_date'|_ }}</option>
+                                {% for array in nextLoop %}
+                                    <option label="{{ array.title }}" value="{{ array.label }}"
+                                            data-start="{{ array.start.format('Y-m-d') }}"
+                                            data-end="{{ array.end.format('Y-m-d') }}">{{ array.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     {% if total == 0 %}
         {% include 'partials.empty' with {objectType: 'default', type: 'bills',route: route('subscriptions.create')} %}
     {% else %}
@@ -43,4 +88,16 @@
 {% block scripts %}
     <script src="v1/js/lib/jquery-ui.min.js?v={{ FF_BUILD_TIME }}" type="text/javascript" nonce="{{ JS_NONCE }}"></script>
     <script type="text/javascript" src="v1/js/ff/bills/index.js?v={{ FF_BUILD_TIME }}" nonce="{{ JS_NONCE }}"></script>
+    <script type="text/javascript" nonce="{{ JS_NONCE }}">
+        var billsIndexUrl = "{{ route(routeName, ['START', 'END']) }}";
+        $(function () {
+            $('.selectPeriod').change(function (e) {
+                var selected = $(e.currentTarget);
+                if (selected.find(":selected").val() !== "x") {
+                    var newUrl = billsIndexUrl.replace("START", selected.find(":selected").data('start')).replace('END', selected.find(":selected").data('end'));
+                    window.location.assign(newUrl);
+                }
+            });
+        });
+    </script>
 {% endblock %}

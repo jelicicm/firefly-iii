@@ -9,6 +9,7 @@
         <th>{{ trans('list.name') }}</th>
         <th class="hidden-sm hidden-md hidden-xs">{{ trans('list.linked_to_rules') }}</th>
         <th class="text-right">{{ trans('list.matchingAmount') }}</th>
+        <th class="text-right hidden-sm hidden-xs">{{ trans('list.amount_paid_in_period') }}</th>
         <th class="hidden-sm hidden-xs">{{ trans('list.paid_current_period') }}</th>
         <th class="hidden-sm hidden-xs">{{ trans('list.next_expected_match') }}</th>
         <th class="hidden-sm hidden-xs">{{ trans('list.repeat_freq') }}</th>
@@ -22,7 +23,7 @@
             <tr>
                 <td class="hidden-sm hidden-xs">&nbsp;</td>
                 <td class="hidden-sm hidden-xs">&nbsp;</td>
-                <td colspan="6"><small>{{ objectGroup.object_group_title }}</small></td>
+                <td colspan="7"><small>{{ objectGroup.object_group_title }}</small></td>
             </tr>
             {% for entry in objectGroup.bills %}
                 <tr class="bill-sortable" data-id="{{ entry.id }}" data-name="{{ entry.name }}"
@@ -73,54 +74,30 @@
                     </td>
 
                     {#
-                    paidDates = 0 (bill not paid in period)
-                    pay_dates  = 0 (bill not expected to be paid in this period)
-                    bill is active.
+                    Amount paid in period column: show actual amount of the latest payment,
+                    or empty if no payment was made in this period.
                     #}
-                    {% if entry.paid_dates|length == 0 and entry.pay_dates|length == 0 and entry.active %}
-                        <td class="paid_in_period text-muted">
-                            {{ trans('firefly.not_expected_period') }}
-                        </td>
-                        <td class="expected_in_period hidden-sm hidden-xs">
-                            {% if entry.next_expected_match %}
-                                {{ formatDate(entry.next_expected_match, monthAndDayFormat) }}
+                    {% if entry.paid_dates|length > 0 %}
+                        {% set latest_paid = null %}
+                        {% for paid in entry.paid_dates %}
+                            {% if latest_paid is null or paid.date > latest_paid.date %}
+                                {% set latest_paid = paid %}
                             {% endif %}
+                        {% endfor %}
+                        <td class="text-right hidden-sm hidden-xs">
+                            <a href="{{ route('transactions.show', latest_paid.transaction_group_id) }}">
+                                {{ formatAmountBySymbol(latest_paid.amount, latest_paid.currency_symbol, latest_paid.currency_decimal_places) }}
+                            </a>
                         </td>
+                    {% else %}
+                        <td class="hidden-sm hidden-xs">&nbsp;</td>
                     {% endif %}
 
                     {#
-                    paid_dates = 0 (bill not paid in period)
-                    pay_dates  > 0 (bill IS expected to be paid in this period)
-                    bill is active
-                    first pay date is in the past.
+                    Bill has actual payments in this period — show for any bill (active or not).
                     #}
-                    {% if entry.paid_dates|length == 0 and entry.pay_dates|length > 0 and entry.active %}
-                        {% if entry.next_expected_match_diff == trans('firefly.not_expected_period') %} {# terrible code, you should sue me for this. #}
-                            <td class="paid_in_period text-muted">
-                                {{ entry.next_expected_match_diff }}
-                            </td>
-                        {% else %}
-                            <td class="paid_in_period text-warning">
-                                {{ entry.next_expected_match_diff }}
-                                <!-- {{ trans('firefly.bill_expected_date', {date: entry.next_expected_match_diff }) }} -->
-                            </td>
-                        {% endif %}
-                        <td class="expected_in_period hidden-sm hidden-xs">
-
-                            {% for date in entry.pay_dates %}
-                                {{ formatDate(date, monthAndDayFormat) }}<br>
-                            {% endfor %}
-
-                        </td>
-                    {% endif %}
-
-                    {#
-                    paid_dates >= 0 (bill is paid X times).
-                    Don't care about pay_dates.
-                    #}
-                    {% if entry.paid_dates|length > 0 and entry.active %}
+                    {% if entry.paid_dates|length > 0 %}
                         <td class="paid_in_period text-success">
-
                             {% for currentPaid in entry.paid_dates %}
                                 <a href="{{ route('transactions.show',currentPaid.transaction_group_id) }}">
                                     {{ formatDate(currentPaid.date, monthAndDayFormat) }}
@@ -130,17 +107,49 @@
                         </td>
                         <td class="expected_in_period hidden-sm hidden-xs">
                             {% if entry.next_expected_match %}
-                                    {{ formatDate(entry.next_expected_match, monthAndDayFormat) }}
-                                {% else %}
-                                    <span class="text-muted">{{ entry.next_expected_match_diff }}</span>
+                                {{ formatDate(entry.next_expected_match, monthAndDayFormat) }}
+                            {% else %}
+                                <span class="text-muted">{{ entry.next_expected_match_diff }}</span>
                             {% endif %}
                         </td>
-                    {% endif %}
-                    {# bill is not active #}
-                    {% if not entry.active %}
-                        <td class="paid_in_period text-muted">
-                            ~
+
+                    {#
+                    Active bill, expected in period but not yet paid.
+                    #}
+                    {% elseif entry.period_active and entry.pay_dates|length > 0 %}
+                        {% if entry.next_expected_match_diff == trans('firefly.not_expected_period') %} {# terrible code, you should sue me for this. #}
+                            <td class="paid_in_period text-muted">
+                                {{ entry.next_expected_match_diff }}
+                            </td>
+                        {% else %}
+                            <td class="paid_in_period text-warning">
+                                {{ entry.next_expected_match_diff }}
+                            </td>
+                        {% endif %}
+                        <td class="expected_in_period hidden-sm hidden-xs">
+                            {% for date in entry.pay_dates %}
+                                {{ formatDate(date, monthAndDayFormat) }}<br>
+                            {% endfor %}
                         </td>
+
+                    {#
+                    Active bill, not expected in this period.
+                    #}
+                    {% elseif entry.period_active %}
+                        <td class="paid_in_period text-muted">
+                            {{ trans('firefly.not_expected_period') }}
+                        </td>
+                        <td class="expected_in_period hidden-sm hidden-xs">
+                            {% if entry.next_expected_match %}
+                                {{ formatDate(entry.next_expected_match, monthAndDayFormat) }}
+                            {% endif %}
+                        </td>
+
+                    {#
+                    Inactive bill with no payments in this period.
+                    #}
+                    {% else %}
+                        <td class="paid_in_period text-muted">~</td>
                         <td class="expected_in_period text-muted hidden-sm hidden-xs">~</td>
                     {% endif %}
                     <td class="hidden-sm hidden-xs">
@@ -182,6 +191,7 @@
                         <td class="text-right"> <!-- amount -->
                             {{ formatAmountBySymbol(sum.avg, sum.currency_symbol, sum.currency_decimal_places) }}
                         </td>
+                        <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- amount paid in period -->
                         <td>&nbsp;</td> <!-- paid in period -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- next expected match -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td><!-- repeats -->
@@ -197,6 +207,7 @@
                         <td class="text-right"> <!-- amount -->
                             {{ formatAmountBySymbol(sum.total_left_to_pay, sum.currency_symbol, sum.currency_decimal_places) }}
                         </td>
+                        <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- amount paid in period -->
                         <td>&nbsp;</td> <!-- paid in period -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- next expected match -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td><!-- repeats -->
@@ -213,6 +224,7 @@
                         <td class="text-right"> <!-- amount -->
                             {{ formatAmountBySymbol(sum.per_period, sum.currency_symbol, sum.currency_decimal_places) }}
                         </td>
+                        <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- amount paid in period -->
                         <td>&nbsp;</td> <!-- paid in period -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- next expected match -->
                         <td class="hidden-sm hidden-xs">&nbsp;</td><!-- repeats -->
@@ -225,7 +237,7 @@
     {% if totals|length > 0 %}
         <tfoot>
         <tr>
-            <td colspan="8" class="top-dark-border"></td>
+            <td colspan="9" class="top-dark-border"></td>
         </tr>
         {% for sum in totals %}
             {% if '0' != sum.avg %}
@@ -238,6 +250,7 @@
                     <td class="text-right"> <!-- amount -->
                         {{ formatAmountBySymbol(sum.avg, sum.currency_symbol, sum.currency_decimal_places) }}
                     </td>
+                    <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- amount paid in period -->
                     <td>&nbsp;</td> <!-- paid in period -->
                     <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- next expected match -->
                     <td class="hidden-sm hidden-xs">&nbsp;</td><!-- repeats -->
@@ -254,6 +267,7 @@
                     <td class="text-right"> <!-- amount -->
                         {{ formatAmountBySymbol(sum.per_period, sum.currency_symbol, sum.currency_decimal_places) }}
                     </td>
+                    <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- amount paid in period -->
                     <td>&nbsp;</td> <!-- paid in period -->
                     <td class="hidden-sm hidden-xs">&nbsp;</td> <!-- next expected match -->
                     <td class="hidden-sm hidden-xs">&nbsp;</td><!-- repeats -->

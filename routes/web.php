@@ -244,7 +244,9 @@ Route::group(
 Route::group(
     ['middleware' => 'user-full-auth', 'namespace' => 'FireflyIII\Http\Controllers', 'prefix' => 'bills', 'as' => 'bills.'],
     static function (): void {
-        Route::get('', ['uses' => 'Bill\IndexController@index', 'as' => 'index']);
+        Route::get('{start_date?}/{end_date?}', ['uses' => 'Bill\IndexController@index', 'as' => 'index'])
+            ->where(['start_date' => DATEFORMAT])
+            ->where(['end_date' => DATEFORMAT]);
         Route::post('rescan/{bill}', ['uses' => 'Bill\ShowController@rescan', 'as' => 'rescan']);
         Route::get('create', ['uses' => 'Bill\CreateController@create', 'as' => 'create']);
         Route::get('edit/{bill}', ['uses' => 'Bill\EditController@edit', 'as' => 'edit']);
@@ -262,7 +264,9 @@ Route::group(
 Route::group(
     ['middleware' => 'user-full-auth', 'namespace' => 'FireflyIII\Http\Controllers', 'prefix' => 'subscriptions', 'as' => 'subscriptions.'],
     static function (): void {
-        Route::get('', ['uses' => 'Bill\IndexController@index', 'as' => 'index']);
+        Route::get('{start_date?}/{end_date?}', ['uses' => 'Bill\IndexController@index', 'as' => 'index'])
+            ->where(['start_date' => DATEFORMAT])
+            ->where(['end_date' => DATEFORMAT]);
         Route::post('rescan/{bill}', ['uses' => 'Bill\ShowController@rescan', 'as' => 'rescan']);
         Route::get('create', ['uses' => 'Bill\CreateController@create', 'as' => 'create']);
         Route::get('edit/{bill}', ['uses' => 'Bill\EditController@edit', 'as' => 'edit']);

@@ -208,15 +208,25 @@ class BillRepository implements BillRepositoryInterface, UserGroupInterface
         });
     }
 
-    public function getBills(): Collection
+    public function getBills(?Carbon $start = null, ?Carbon $end = null): Collection
     {
-        return $this->user
+        $query = $this->user
             ->bills()
             ->orderBy('order', 'ASC')
             ->orderBy('active', 'DESC')
             ->orderBy('name', 'ASC')
-            ->get()
         ;
+
+        if ($start instanceof Carbon && $end instanceof Carbon) {
+            $query->where('date', '<=', $end->format('Y-m-d'))
+                  ->where(static function ($q) use ($start): void {
+                      $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $start->format('Y-m-d'));
+                  })
+            ;
+        }
+
+        return $query->get();
     }
 
     public function getBillsForAccounts(Collection $accounts): Collection

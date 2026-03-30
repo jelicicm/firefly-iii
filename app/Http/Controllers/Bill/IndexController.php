@@ -24,12 +24,13 @@ declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Bill;
 
+use Carbon\Carbon;
 use FireflyIII\Http\Controllers\Controller;
 use FireflyIII\Models\Bill;
 use FireflyIII\Repositories\Bill\BillRepositoryInterface;
 use FireflyIII\Repositories\ObjectGroup\OrganisesObjectGroups;
 use FireflyIII\Support\Facades\Navigation;
-use FireflyIII\Support\Facades\Preferences;
+use FireflyIII\Support\Http\Controllers\DateCalculation;
 use FireflyIII\Support\JsonApi\Enrichments\SubscriptionEnrichment;
 use FireflyIII\Transformers\BillTransformer;
 use FireflyIII\User;
@@ -46,6 +47,7 @@ use Symfony\Component\HttpFoundation\ParameterBag;
  */
 final class IndexController extends Controller
 {
+    use DateCalculation;
     use OrganisesObjectGroups;
 
     private BillRepositoryInterface $repository;
@@ -69,24 +71,37 @@ final class IndexController extends Controller
     /**
      * Show all bills.
      */
-    public function index(): Application|Factory|\Illuminate\Contracts\Foundation\Application|View
+    public function index(?Carbon $start = null, ?Carbon $end = null): Application|Factory|\Illuminate\Contracts\Foundation\Application|View
     {
         $this->cleanupObjectGroups();
         $this->repository->correctOrder();
         $this->repository->correctTransfers();
-        $start       = session('start')->clone();
-        $end         = session('end')->clone();
-        $viewRange   = Preferences::get('viewRange', '1M')->data;
+
+        $range       = Navigation::getViewRange(true);
+        $isCustomRange = session('is_custom_range', false);
+        if (false === $isCustomRange) {
+            $start ??= session('start', today(config('app.timezone'))->startOfMonth());
+            $end   ??= Navigation::endOfPeriod($start, $range);
+        }
+        if (true === $isCustomRange) {
+            $start ??= session('start', today(config('app.timezone'))->startOfMonth());
+            $end   ??= session('end', today(config('app.timezone'))->endOfMonth());
+        }
 
         // give the end some extra space when the user has last7, last30 or last90.
-        if ('last7' === $viewRange || 'last30' === $viewRange) {
+        if ('last7' === $range || 'last30' === $range) {
             $end->addDays(30);
         }
-        if ('last90' === $viewRange) {
+        if ('last90' === $range) {
             $end->addDays(90);
         }
 
-        $collection  = $this->repository->getBills();
+        // period navigation data
+        $periodTitle = Navigation::periodShow($start, $range);
+        $prevLoop    = $this->getPreviousPeriods($start, $range);
+        $nextLoop    = $this->getNextPeriods($start, $range);
+
+        $collection  = $this->repository->getBills($start, $end);
         $total       = $collection->count();
 
         $parameters  = new ParameterBag();
@@ -134,6 +149,17 @@ final class IndexController extends Controller
             $array['currency_decimal_places'] = $currency->decimal_places;
             $array['attachments']             = $this->repository->getAttachments($bill);
             $array['rules']                   = $rules[$bill['id']] ?? [];
+
+            // Determine if this bill was active during the selected period.
+            // A bill with actual payments is always shown with that data.
+            // For currently-active bills, also use the bill's own date boundaries.
+            $billStartDate                    = $bill->date;
+            $billEndDate                      = $bill->end_date;
+            $array['period_active']           = count($array['paid_dates']) > 0
+                || ($bill->active
+                    && $billStartDate->lte($end)
+                    && (null === $billEndDate || $billEndDate->gte($start)));
+
             $bills[$groupOrder]['bills'][]    = $array;
         }
         // order by key
@@ -144,7 +170,19 @@ final class IndexController extends Controller
         $totals      = $this->getTotals($sums);
         $today       = now()->startOfDay();
 
-        return view('bills.index', ['bills' => $bills, 'sums' => $sums, 'total' => $total, 'totals' => $totals, 'today' => $today]);
+        return view('bills.index', [
+            'bills'       => $bills,
+            'sums'        => $sums,
+            'total'       => $total,
+            'totals'      => $totals,
+            'today'       => $today,
+            'prevLoop'    => $prevLoop,
+            'nextLoop'    => $nextLoop,
+            'periodTitle' => $periodTitle,
+            'start'       => $start,
+            'end'         => $end,
+            'routeName'   => request()->route()->getName(),
+        ]);
     }
 
     /**
@@ -217,8 +255,8 @@ final class IndexController extends Controller
 
             /** @var array $bill */
             foreach ($group['bills'] as $bill) {
-                if (false === $bill['active']) {
-                    Log::debug(sprintf('Skip subscription #%d, inactive.', $bill['id']));
+                if (false === $bill['period_active']) {
+                    Log::debug(sprintf('Skip subscription #%d, not active in period.', $bill['id']));
 
                     continue;
                 }
